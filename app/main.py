@@ -127,17 +127,19 @@ async def generate_keyframe(request: KeyframeRequest):
 
     size = "864x1536" if request.aspect_ratio == "9:16" else "1536x864"
     prompt = (
-        request.prompt[:3500]
-        + "\nCreate a NEW scene-specific cinematic keyframe. Preserve the exact identity, face, age, hair, and recognizable features of the supplied character reference image(s). "
-        + "Do not preserve the original clothing, pose, background, captions, logos, or subtitles unless the scene explicitly requires them. "
-        + "Change wardrobe, pose, lighting, camera composition, and environment to match this scene. "
-        + "No text, no subtitles, no watermark, no UI elements. Photorealistic cinematic still."
+        "CREATE A COMPLETELY NEW CINEMATIC SCENE. The supplied image(s) are IDENTITY REFERENCES ONLY, not a starting frame. "
+        "Keep only each character's facial identity, age, hair identity, skin tone, and recognizable facial features. "
+        "REPLACE the original pose, body position, clothing, camera angle, crop, background, lighting, props, and environment. "
+        "Remove and do not reproduce any text, subtitles, captions, logos, borders, or UI from the reference image. "
+        "The final image must look like a newly photographed frame from the requested scene, not an edited copy of the reference.\n\n"
+        + request.prompt[:3500]
+        + "\nNo text. No subtitles. No watermark. No UI. Photorealistic cinematic still."
     )
     data = {
         "model": "gpt-image-2",
         "prompt": prompt,
         "size": size,
-        "quality": "low",
+        "quality": "medium",
         "output_format": "jpeg",
         "output_compression": "85",
     }
