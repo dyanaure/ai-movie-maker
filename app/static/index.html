@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AI Movie Maker</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand">🎬 <span>AI Movie Maker</span></div>
+    <button class="nav active">＋ New Movie</button>
+    <div class="steps">
+      <div class="step on"><b>1</b><span>Story</span></div>
+      <div class="step"><b>2</b><span>Characters</span></div>
+      <div class="step"><b>3</b><span>Scenes</span></div>
+      <div class="step"><b>4</b><span>Generate</span></div>
+      <div class="step"><b>5</b><span>Export</span></div>
+    </div>
+  </aside>
+  <main>
+    <section id="story" class="panel">
+      <div class="eyebrow">STEP 1 OF 5</div>
+      <h1>Start your movie</h1>
+      <p class="muted">Paste your screenplay. We'll prepare the cast before generating any expensive video.</p>
+      <label>Movie title</label>
+      <input id="title" value="The Queen They Buried Alive"/>
+      <label>Screenplay</label>
+      <textarea id="script" placeholder="Paste your full movie script here..."></textarea>
+      <div class="row">
+        <div><label>Format</label><select id="ratio"><option>16:9</option><option>9:16</option></select></div>
+        <div><label>Look</label><select id="look"><option>Cinematic fantasy</option><option>Dark fantasy</option><option>Photorealistic</option><option>Anime</option></select></div>
+      </div>
+      <button class="primary" onclick="goCharacters()">Continue to Characters →</button>
+    </section>
+
+    <section id="characters" class="panel hidden">
+      <div class="eyebrow">STEP 2 OF 5</div>
+      <h1>Choose your characters</h1>
+      <p class="muted">Upload a reference image for each actor, then lock the character. Locked references will be reused across scenes.</p>
+      <div id="cast" class="cast"></div>
+      <button class="secondary" onclick="addCharacter()">＋ Add Character</button>
+      <div class="footer-actions">
+        <button class="secondary" onclick="show('story')">← Back</button>
+        <button class="primary" onclick="saveProject()">Save Cast & Continue →</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
