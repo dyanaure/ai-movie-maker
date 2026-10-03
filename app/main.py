@@ -70,9 +70,19 @@ async def generate_video(request: GenerateRequest):
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(f"{LTX_BASE}/v2/{endpoint}", headers=ltx_headers(), json=payload)
     if response.status_code not in (200, 202):
-        try: detail = response.json()
-        except Exception: detail = response.text
-        raise HTTPException(status_code=response.status_code, detail=detail)
+        try:
+            raw = response.json()
+            if isinstance(raw, dict):
+                err = raw.get("error", raw)
+                if isinstance(err, dict):
+                    detail = err.get("message") or err.get("detail") or str(err)
+                else:
+                    detail = str(err)
+            else:
+                detail = str(raw)
+        except Exception:
+            detail = response.text
+        raise HTTPException(status_code=response.status_code, detail=f"LTX {response.status_code}: {detail}")
     data = response.json()
     return {"id": data["id"], "status": "submitted", "mode": endpoint}
 
