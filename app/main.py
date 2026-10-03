@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 LTX_BASE = "https://api.ltx.io"
 
-app = FastAPI(title="AI Movie Maker", version="0.3.0")
+app = FastAPI(title="AI Movie Maker", version="0.4.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -34,6 +34,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     aspect_ratio: str = "9:16"
     duration: int = 6
+    image_uri: str | None = None
 
 
 def ltx_headers():
@@ -50,7 +51,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.3.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
+    return {"status": "ok", "version": "0.4.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
 
 
 @app.post("/projects")
@@ -62,21 +63,25 @@ def create_project(request: MovieRequest):
 @app.post("/generate/video")
 async def generate_video(request: GenerateRequest):
     resolution = "720x1280" if request.aspect_ratio == "9:16" else "1280x720"
+    endpoint = "image-to-video" if request.image_uri else "text-to-video"
     payload = {"prompt": request.prompt[:5000], "model": "ltx-2-5-fast", "duration": request.duration, "resolution": resolution, "fps": 24, "generate_audio": True}
+    if request.image_uri:
+        payload["image_uri"] = request.image_uri
     async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(f"{LTX_BASE}/v2/text-to-video", headers=ltx_headers(), json=payload)
+        response = await client.post(f"{LTX_BASE}/v2/{endpoint}", headers=ltx_headers(), json=payload)
     if response.status_code not in (200, 202):
         try: detail = response.json()
         except Exception: detail = response.text
         raise HTTPException(status_code=response.status_code, detail=detail)
     data = response.json()
-    return {"id": data["id"], "status": "submitted"}
+    return {"id": data["id"], "status": "submitted", "mode": endpoint}
 
 
 @app.get("/generate/video/{job_id}")
-async def generation_status(job_id: str):
+async def generation_status(job_id: str, mode: str = "text-to-video"):
+    endpoint = "image-to-video" if mode == "image-to-video" else "text-to-video"
     async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.get(f"{LTX_BASE}/v2/text-to-video/{job_id}", headers=ltx_headers())
+        response = await client.get(f"{LTX_BASE}/v2/{endpoint}/{job_id}", headers=ltx_headers())
     if response.status_code != 200:
         try: detail = response.json()
         except Exception: detail = response.text
