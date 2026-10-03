@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 LTX_BASE = "https://api.ltx.io"
 
-app = FastAPI(title="AI Movie Maker", version="0.7.0")
+app = FastAPI(title="AI Movie Maker", version="0.8.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.middleware("http")
@@ -48,6 +48,12 @@ class GenerateRequest(BaseModel):
     image_uri: str | None = None
 
 
+class KeyframeRequest(BaseModel):
+    prompt: str
+    aspect_ratio: str = "9:16"
+    images: List[str] = []
+
+
 def ltx_headers():
     key = os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY")
     if not key:
@@ -62,7 +68,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.7.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
+    return {"status": "ok", "version": "0.8.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
 
 
 @app.post("/projects")
@@ -96,6 +102,60 @@ async def upload_data_image(client: httpx.AsyncClient, data_uri: str) -> str:
     if uploaded.status_code not in (200, 201, 204):
         raise HTTPException(status_code=502, detail={"stage":"2_media_upload","message":f"LTX media upload failed ({uploaded.status_code}): {uploaded.text[:500]}"})
     return info["storage_uri"]
+
+
+@app.post("/generate/keyframe")
+async def generate_keyframe(request: KeyframeRequest):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured on Render.")
+    if not request.images:
+        raise HTTPException(status_code=400, detail="At least one locked character reference image is required.")
+
+    files = []
+    for idx, data_uri in enumerate(request.images[:4]):
+        match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,(.+)$", data_uri, re.S)
+        if not match:
+            raise HTTPException(status_code=400, detail=f"Character reference {idx + 1} must be JPEG, PNG, or WEBP.")
+        mime, encoded = match.groups()
+        try:
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Character reference {idx + 1} is invalid.")
+        ext = "jpg" if mime == "image/jpeg" else mime.split("/")[-1]
+        files.append(("image[]", (f"reference_{idx + 1}.{ext}", image_bytes, mime)))
+
+    size = "864x1536" if request.aspect_ratio == "9:16" else "1536x864"
+    prompt = (
+        request.prompt[:3500]
+        + "\nCreate a NEW scene-specific cinematic keyframe. Preserve the exact identity, face, age, hair, and recognizable features of the supplied character reference image(s). "
+        + "Do not preserve the original clothing, pose, background, captions, logos, or subtitles unless the scene explicitly requires them. "
+        + "Change wardrobe, pose, lighting, camera composition, and environment to match this scene. "
+        + "No text, no subtitles, no watermark, no UI elements. Photorealistic cinematic still."
+    )
+    data = {
+        "model": "gpt-image-2",
+        "prompt": prompt,
+        "size": size,
+        "quality": "low",
+        "output_format": "jpeg",
+        "output_compression": "85",
+    }
+    headers = {"Authorization": f"Bearer {api_key}"}
+    async with httpx.AsyncClient(timeout=180) as client:
+        response = await client.post("https://api.openai.com/v1/images/edits", headers=headers, data=data, files=files)
+    if response.status_code != 200:
+        try:
+            raw = response.json()
+            detail = raw.get("error", {}).get("message") or str(raw)
+        except Exception:
+            detail = response.text
+        raise HTTPException(status_code=response.status_code, detail=f"Keyframe generation failed: {detail}")
+    raw = response.json()
+    image_b64 = raw.get("data", [{}])[0].get("b64_json")
+    if not image_b64:
+        raise HTTPException(status_code=502, detail="Keyframe service returned no image.")
+    return {"image_uri": f"data:image/jpeg;base64,{image_b64}", "provider": "gpt-image-2"}
 
 
 @app.post("/generate/video")
