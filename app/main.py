@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 LTX_BASE = "https://api.ltx.io"
 
-app = FastAPI(title="AI Movie Maker", version="0.5.0")
+app = FastAPI(title="AI Movie Maker", version="0.6.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -53,7 +53,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.5.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
+    return {"status": "ok", "version": "0.6.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
 
 
 @app.post("/projects")
@@ -79,13 +79,13 @@ async def upload_data_image(client: httpx.AsyncClient, data_uri: str) -> str:
             detail = signed.json()
         except Exception:
             detail = signed.text
-        raise HTTPException(status_code=signed.status_code, detail=f"LTX upload setup failed: {detail}")
+        raise HTTPException(status_code=signed.status_code, detail={"stage":"1_upload_setup","message":f"LTX upload setup failed: {detail}"})
     info = signed.json()
     upload_headers = dict(info.get("required_headers") or {})
     upload_headers["Content-Type"] = mime
     uploaded = await client.put(info["upload_url"], content=image_bytes, headers=upload_headers)
     if uploaded.status_code not in (200, 201, 204):
-        raise HTTPException(status_code=502, detail=f"LTX media upload failed ({uploaded.status_code}): {uploaded.text[:500]}")
+        raise HTTPException(status_code=502, detail={"stage":"2_media_upload","message":f"LTX media upload failed ({uploaded.status_code}): {uploaded.text[:500]}"})
     return info["storage_uri"]
 
 
@@ -114,7 +114,7 @@ async def generate_video(request: GenerateRequest):
                 detail = str(raw)
         except Exception:
             detail = response.text
-        raise HTTPException(status_code=response.status_code, detail=f"LTX {response.status_code}: {detail}")
+        raise HTTPException(status_code=response.status_code, detail={"stage":"3_video_submit","message":f"LTX {response.status_code}: {detail}"})
     data = response.json()
     return {"id": data["id"], "status": "submitted", "mode": endpoint}
 
