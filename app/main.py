@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 LTX_BASE = "https://api.ltx.io"
 
-app = FastAPI(title="AI Movie Maker", version="0.6.0")
+app = FastAPI(title="AI Movie Maker", version="0.7.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.middleware("http")
@@ -62,7 +62,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.6.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
+    return {"status": "ok", "version": "0.7.0", "ltx_configured": bool(os.environ.get("LTX_API_KEY") or os.environ.get("LTXV_API_KEY"))}
 
 
 @app.post("/projects")
@@ -102,7 +102,7 @@ async def upload_data_image(client: httpx.AsyncClient, data_uri: str) -> str:
 async def generate_video(request: GenerateRequest):
     resolution = "720x1280" if request.aspect_ratio == "9:16" else "1280x720"
     endpoint = "image-to-video" if request.image_uri else "text-to-video"
-    payload = {"prompt": request.prompt[:5000], "model": "ltx-2-5-fast", "duration": request.duration, "resolution": resolution, "fps": 24, "generate_audio": True}
+    payload = {"prompt": request.prompt[:5000], "model": "ltx-2-5-fast", "duration": request.duration, "resolution": resolution, "fps": 24, "generate_audio": False}
     async with httpx.AsyncClient(timeout=60) as client:
         if request.image_uri:
             image_uri = request.image_uri
